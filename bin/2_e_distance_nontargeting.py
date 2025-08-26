@@ -58,6 +58,7 @@ gRNA_region_dict = util_functions.get_gRNA_region_dict(annotation_df,
                                                        gRNA_dict,
                                                        config["input_data"]["annotation_file"]["concatenate_key"])
 
+
 gRNA_region_clear_dict = {}
 
 for key in gRNA_region_dict.keys():
@@ -399,7 +400,9 @@ for target_index, target_name in pbar:
             if target_name not in pval_dict:
                 pval_dict[target_name] = {}
                 pval_dict[target_name]["cell_count"] = len(target_cell_names)
-                pval_dict[target_name]["type"] = get_type_target(target_name,annotation_df)
+                ### v1.1.1 bug fix
+                pval_dict[target_name]["type"] = get_type_target(target_name,annotation_df,
+                                                                 annotation_col=config["input_data"]["annotation_file"]["concatenate_key"])
 
             # Store observed distance and calculate p-value
             pval_dict[target_name][f"distance_{bg_index}"] = obs_edist.item() # Use .item() for scalar tensor

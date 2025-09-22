@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
-
 import sys
 import os
 
@@ -46,6 +44,10 @@ json_fp = sys.argv[1]
 with open(json_fp, 'r') as fp:
     config = json.load(fp)
 
+print("--- Configuration Loaded ---")
+print(json.dumps(config, indent=4))
+print("--------------------------")
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -60,7 +62,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
                                               )
 
 
-annotation_df = pd.read_csv(config["input_data"]["annotation_file"]["file_path"],index_col=None)
+annotation_df = util_functions.load_annotation(config["input_data"]["annotation_file"]["file_path"])
+
+#Output the comparison between annotation_df and gRNA_dict
+discordance_gRNA_df = util_functions.check_annotation_gRNA_table(annotation_df,gRNA_dict)
+discordance_gRNA_df.to_csv(os.path.join(config["output_file_name_list"]["OUTPUT_FOLDER"],
+                                        config["output_file_name_list"]["discordance_gRNA_table"]))
 
 gRNA_region_dict = util_functions.get_gRNA_region_dict(annotation_df,
                                                        gRNA_dict,
@@ -214,9 +221,9 @@ def calculate_distance(X, cell_test1, cell_test2, device):
                                                      1, 1, return_permute=False).cpu()
         return obs_edist.item()
     except Exception as e_gpu: # Catch specific OOM error if possible, otherwise generic Exception
-        # Check if it looks like an Out Of Memory error (heuristic)
         if 'memory' in str(e_gpu).lower():
             mode = "OOM -> CPU"
+            print("GPU calculation failed, try in CPU.")
             try:
                 # Fallback to CPU
                 obs_edist = energy_distance_calc.permutation_test(X, cell_test1, cell_test2, "cpu",
@@ -325,7 +332,17 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
         for index_combi, (combi_test1, combi_test2) in enumerate(total_combis):
             # Get cells for the current combination
             cell_test1, cell_test2 = get_cells_for_sgrna_groups(combi_test1, combi_test2, gRNA_dict)
-
+            
+            #Downsampling for combination test
+            if not (config["gRNA_filtering"]["combi_cell_num_max"] == "all" or \
+                config["gRNA_filtering"]["combi_cell_num_max"] == "All"):
+                if len(cell_test1) > config["gRNA_filtering"]["combi_cell_num_max"]:
+                    print(f"{target}: Combi1 has too many ({len(cell_test1)}) cells, downsampled to {config["gRNA_filtering"]["combi_cell_num_max"]}")
+                    cell_test1 = np.random.choice(cell_test1,config["gRNA_filtering"]["combi_cell_num_max"],replace=False)
+                if len(cell_test2) > config["gRNA_filtering"]["combi_cell_num_max"]:
+                    print(f"{target}: Combi2 has too many ({len(cell_test2)}) cells, downsampled to {config["gRNA_filtering"]["combi_cell_num_max"]}")
+                    cell_test2 = np.random.choice(cell_test2,config["gRNA_filtering"]["combi_cell_num_max"],replace=False)
+                
             # Try calculating on the primary device (potentially GPU)
             # Calculate distance with GPU/CPU fallback
             distance = calculate_distance(pca_df, cell_test1, cell_test2, device)
@@ -381,7 +398,8 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
         # Removed print statement for batch size here, logged before calling
         try:
             # Attempt calculation on the primary device (potentially GPU)
-            obs_fvalue, fvalue_list = energy_distance_calc.disco_test(X, total_cell_list, device, batch_num=batch_num)
+            obs_fvalue, fvalue_list = \
+                energy_distance_calc.disco_test(X, total_cell_list, device, batch_num=batch_num)
             obs_fvalue = obs_fvalue.numpy(),
             fvalue_list = fvalue_list.numpy()
 
@@ -393,7 +411,8 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
                 print(f"    GPU execution failed for {target_name} (likely OOM). Falling back to CPU. Error: {e_gpu}", flush=True)
                 try:
                     # print(f"    Attempting disco test on CPU for {target_name}", flush=True) # Optional verbose
-                    obs_fvalue, fvalue_list = energy_distance_calc.disco_test(X, total_cell_list, "cpu", batch_num=batch_num)
+                    obs_fvalue, fvalue_list = \
+                        energy_distance_calc.disco_test(X, total_cell_list, "cpu", batch_num=batch_num)
                     disco_pvalue = np.sum(fvalue_list > obs_fvalue) / total_permute_disco
                     #print(f"    Disco test completed on CPU for {target_name}. p-value: {disco_pvalue:.4f}", flush=True)
                     return disco_pvalue
@@ -401,7 +420,6 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
                     print(f"    CPU execution also failed for {target_name}. Skipping disco test. Error: {e_cpu}", flush=True)
                     return np.nan
             else:
-                #print(f"    GPU execution failed for {target_name} (non-memory error). Skipping disco test. Error: {e_gpu}", flush=True)
                 return np.nan
 
 

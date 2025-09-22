@@ -172,6 +172,8 @@ Parameters controlling the gRNA filtering process in `1_filtereing_gRNA.py`.
 
 * **`total_permute_disco`**: (Integer) The number of permutations to perform for the DISCO (Distance Components) test. The DISCO test assesses if the distributions of cells associated with different gRNAs for the *same* target region are significantly different from each other.
 
+* **`combi_cell_num_max`**: (str or integer) [`All` or max number of cell per combi] The maximum number of cells per gRNA combis. Note that larger number of cells require large memory and 1000 cells per gRNA combis is usually large enough to find ourlier.
+
 * **`batch_num_basic`**: (Integer) The base batch number used in the DISCO test calculation. The actual batch size might be adjusted downwards based on the total number of cells involved to manage memory, particularly for GPU calculations.
 
 #### `permutation_test`
@@ -183,6 +185,8 @@ Parameters controlling the permutation testing in `2_e_distance_nontargeting.py`
 * **`num_of_bg`**: (Integer) The number of independent non-targeting background cell sets to generate. Each target region is compared against each of these background sets, and the resulting p-values and distances are averaged to get a more robust estimate.
 
 * **`non_target_pick`**: (Integer) The number of cells to randomly sample (from the pool of all cells associated with *filtered* non-targeting gRNAs) to create each background set specified by `num_of_bg`. Therefore, total number of the non-targeting cells used for background is `num_of_bg` * `non_target_pick`.
+
+* **`target_cell_num_max`**: (str or integer) [`All` or max number of cell per target] The maximum number of cells per target. Note that larger number of cells require large memory.
 
 * **`batch_num_basic`**: (Integer) The base batch number used for the energy distance permutation test calculations (target vs. non-targeting). Similar to the DISCO test, the actual batch size might be adjusted based on the number of cells in the target region to manage computational resources.
 

@@ -29,6 +29,10 @@ with open(json_fp, 'r') as fp:
 
 with open(json_fp_cluster, 'r') as fp:
     config_clustering = json.load(fp)
+    
+print("--- Configuration Loaded ---")
+print(json.dumps(config_clustering, indent=4))
+print("--------------------------")
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -39,7 +43,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
                                                os.path.join(config["output_file_name_list"]["OUTPUT_FOLDER"],
                                                             config["output_file_name_list"]["gRNA_dict"]),
                                                obsm_key=config["input_data"]["h5ad_file"]["obsm_key"],
-                                               overwrite=config["output_file_name_list"]["OVERWRITE_PCA_DICT"]
+                                               overwrite=False
                                               )
 sgRNA_outlier_df = pd.read_csv(os.path.join(config["output_file_name_list"]["OUTPUT_FOLDER"],
                                                   config["output_file_name_list"]["targeting_outlier_table"]),
@@ -52,7 +56,7 @@ nontargeting_outlier_df = pd.read_csv(os.path.join(config["output_file_name_list
 clear_sgRNA_list = sgRNA_outlier_df[sgRNA_outlier_df["pval_outlier"]>0.05].index.tolist()
 clear_nt_sgRNA_list = nontargeting_outlier_df[nontargeting_outlier_df["pval_outlier"]>0.05].index.tolist()
 
-annotation_df = pd.read_csv(config["input_data"]["annotation_file"]["file_path"],index_col=None)
+annotation_df = util_functions.load_annotation(config["input_data"]["annotation_file"]["file_path"])
 
 gRNA_region_dict = util_functions.get_gRNA_region_dict(annotation_df,
                                                        gRNA_dict,

@@ -1,4 +1,6 @@
 import os
+import sys
+
 import gc
 import pickle
 import pandas as pd
@@ -7,6 +9,60 @@ import scanpy as sc
 from tqdm import tqdm
 from collections import defaultdict # Import defaultdict
 
+def load_annotation(annotation_file_path):
+    """
+    Load annotation file. check format(tab, or comma-delimed) and load with appropriate format.
+    """
+    print("Load csv formated annotation file")
+    annotation_df = pd.read_csv(annotation_file_path,index_col=None)
+
+    if ("guide_id" not in annotation_df.columns) | ("type" not in annotation_df.columns):
+        print("required columns(guide_id,type) is not detected in the columns. Try loading as tab-delimed files")
+        annotation_df = pd.read_csv(annotation_file_path,sep="\t",index_col=None)
+        if ("guide_id" not in annotation_df.columns) | ("type" not in annotation_df.columns):
+            print("[Error] Annotation file format. \n",
+                  "Are required columns included in the annotation files? is this a comma or tab-delimed file?")
+            sys.exit(1)
+    print("annotation file loaded")
+    print("--------")
+    gRNA_type_list = [
+                    "safe-targeting",
+                    "non-targeting",
+                    "targeting",
+                    "positive control",
+                    "negative control",
+                    "variant"]
+    for gRNA_type in gRNA_type_list:
+        gRNA_type_anno = annotation_df[annotation_df["type"]==gRNA_type]
+        print(f"{gRNA_type}: {gRNA_type_anno.shape[0]} gRNAs")
+    return annotation_df
+
+def check_annotation_gRNA_table(annotation_df,gRNA_dict):
+    if not "guide_id" in annotation_df.columns:
+        print("annotation df does not contains [guide_id] column name. Please check the format")
+        sys.exit(1)
+    else:
+        annotation_gRNA_names = annotation_df["guide_id"].values
+        gRNA_name = list(gRNA_dict.keys())
+        overlap_gRNA = np.intersect1d(annotation_gRNA_names,gRNA_name)
+        annotation_only = np.setdiff1d(annotation_gRNA_names,gRNA_name)
+        gRNA_dict_only = np.setdiff1d(gRNA_name,annotation_gRNA_names)
+        
+        print(f"{len(overlap_gRNA)} gRNAs are found in both annotation and gRNA_dict")
+        print(f"{len(annotation_only)} gRNAs are found only in annotation (possibly dropout)")
+        print(f"{len(gRNA_dict_only)} gRNAs are found only in gRNA_dict")
+        
+        annotation_only_df = pd.DataFrame(columns=["gRNA_name","status"])
+        annotation_only_df["gRNA_name"] = annotation_only
+        annotation_only_df["status"] = "annotation_only"
+        
+        gRNA_dict_only_df = pd.DataFrame(columns=["gRNA_name","status"])
+        gRNA_dict_only_df["gRNA_name"] = gRNA_dict_only
+        gRNA_dict_only_df["status"] = "gRNA_dict_only"
+        
+        output_df = pd.concat([annotation_only_df,gRNA_dict_only_df])
+        return output_df        
+    
 def get_gRNA_region_dict(annotation_df,gRNA_dict,
                          concatenate_key="intended_target_name",non_target_key="non-targeting"):
     """

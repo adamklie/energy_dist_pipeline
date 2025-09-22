@@ -22,10 +22,13 @@ import util_functions
 import energy_distance_calc
 
 
-
 json_fp = sys.argv[1]
 with open(json_fp, 'r') as fp:
     config = json.load(fp)
+
+print("--- Configuration Loaded ---")
+print(json.dumps(config, indent=4))
+print("--------------------------")
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -52,7 +55,12 @@ clear_sgRNA_list = sgRNA_outlier_df[sgRNA_outlier_df["pval_outlier"]>0.05].index
 clear_nt_sgRNA_list = nontargeting_outlier_df[nontargeting_outlier_df["pval_outlier"]>0.05].index.tolist()
 
 
-annotation_df = pd.read_csv(config["input_data"]["annotation_file"]["file_path"],index_col=None)
+annotation_df = util_functions.load_annotation(config["input_data"]["annotation_file"]["file_path"])
+
+#Output the comparison between annotation_df and gRNA_dict
+discordance_gRNA_df = util_functions.check_annotation_gRNA_table(annotation_df,gRNA_dict)
+discordance_gRNA_df.to_csv(os.path.join(config["output_file_name_list"]["OUTPUT_FOLDER"],
+                                        config["output_file_name_list"]["discordance_gRNA_table"]))
 
 gRNA_region_dict = util_functions.get_gRNA_region_dict(annotation_df,
                                                        gRNA_dict,
@@ -182,50 +190,33 @@ def run_permutation_test_with_fallback(pbar, pca_df, target_cells, non_target_ce
                                      gpu_device, batch_num, permutations,
                                      current_iter_info, total_cell_info):
     """
-    Runs the energy distance permutation test, attempting GPU first and falling back to CPU.
-
-    Args:
-        pbar (tqdm): The progress bar instance to update postfix.
-        pca_df (pd.DataFrame): DataFrame containing PCA results.
-        target_cells (list): List of target cell names (cleared of overlap).
-        non_target_cells (list): List of non-target cell names (cleared of overlap).
-        gpu_device (torch.device or str): The primary device (GPU) to try.
-        batch_num (int): Batch number for calculation.
-        permutations (int): Number of permutations for the test.
-        current_iter_info (any): Information about the current iteration for postfix.
-        total_cell_info (any): Information about the total cells for postfix.
-
-
-    Returns:
-        tuple: A tuple containing:
-            - obs_edist (float or None): Observed energy distance, or None if calculation failed.
-            - e_dist_list (list or None): List of energy distances from permutations, or None.
+    Runs the energy distance permutation test, cleaning up memory only on failure.
     """
-    obs_edist, e_dist_list = None, None
-    mode = gpu_device # Assume GPU initially
-
     try:
+        # --- Attempt 1: GPU calculation ---
+        mode = gpu_device
         pbar.set_postfix({
             "total cell num": total_cell_info,
             "current iter": current_iter_info,
             "mode": mode
         })
-        # Attempt GPU calculation
         obs_edist, e_dist_list = energy_distance_calc.permutation_test(
             pca_df, target_cells, non_target_cells,
             gpu_device, batch_num, permutations
         )
-        # print(f"Calculation successful on {mode}") # Optional: uncomment for verbose output
+        # On success, return directly without cleanup for better performance.
         return obs_edist, e_dist_list
 
     except Exception as e_gpu:
-        print(f"GPU calculation failed: {e_gpu}. Attempting CPU fallback...")
-        # Clean up GPU memory before CPU attempt
+        # --- GPU Failed: Clean up memory, then try CPU fallback ---
+        print(f"GPU calculation failed: {e_gpu}. Cleaning up and attempting CPU fallback...")
+        
+        # Cleanup is performed here because a failure occurred.
         gc.collect()
         if torch.cuda.is_available():
-             torch.cuda.empty_cache()
+            torch.cuda.empty_cache()
 
-        mode = "CPU" # Switch mode for postfix and calculation
+        mode = "CPU"
         pbar.set_postfix({
             "total cell num": total_cell_info,
             "current iter": current_iter_info,
@@ -233,21 +224,24 @@ def run_permutation_test_with_fallback(pbar, pca_df, target_cells, non_target_ce
         })
 
         try:
-            # Attempt CPU calculation
+            # --- Attempt 2: CPU calculation ---
             obs_edist, e_dist_list = energy_distance_calc.permutation_test(
                 pca_df, target_cells, non_target_cells,
-                "cpu", batch_num, permutations # Explicitly use "cpu"
+                "cpu", batch_num, permutations
             )
-            # print(f"Calculation successful on {mode}") # Optional: uncomment for verbose output
             return obs_edist, e_dist_list
-
+            
         except Exception as e_cpu:
-            # Both GPU and CPU attempts failed
+            # --- Both attempts failed: Clean up memory again ---
             print(f"CPU calculation also failed: {e_cpu}")
             print("Skipping energy distance calculation for this iteration.")
-            # Return None to indicate failure
+            
+            # Cleanup is performed here because the fallback also failed.
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                
             return None, None
-
 
 def save_results(data_dict, output_filename,pval_d=0.00001):
     """
@@ -346,6 +340,11 @@ test_region_np = test_region_np[test_region_np!="non-targeting"]
 pbar = tqdm(enumerate(test_region_np), total=len(test_region_np), desc="Processing Regions")
 
 ### Main loop iterating through target regions
+if use_matched_bg:
+    print("Use matched background")
+else:
+    print("Use non-targeting background")       
+        
 for target_index, target_name in pbar:
     pbar.set_description(f"Processing {target_name}")
     original_target_cell_names = cell_per_region_dict.get(target_name, []) # Get cells for the region
@@ -353,17 +352,21 @@ for target_index, target_name in pbar:
     if len(original_target_cell_names)==0:
         print(f"Warning: No cells found for target region {target_name}. Skipping.")
         continue
-
+    elif not (config["permutation_test"]["target_cell_num_max"]=="all" or \
+                  config["permutation_test"]["target_cell_num_max"]=="All"):
+        if len(original_target_cell_names)>config["permutation_test"]["target_cell_num_max"]:
+            print(f"Too many ({len(original_target_cell_names)}) cell per target downsampled to {config["permutation_test"]["target_cell_num_max"]}")
+            original_target_cell_names = np.random.choice(original_target_cell_names,
+                                                          config["permutation_test"]["target_cell_num_max"],
+                                                          replace=False)
     # Adjust batch size and downsample if necessary
     target_cell_names, batch_num = adjust_processing_parameters(
         original_target_cell_names, batch_num_basic
     )
     
     if use_matched_bg:
-        print("Use matched background")
         background_cell_list = get_matched_background(original_target_cell_names,target_name,num_of_bg,False)
     else:
-        print("Use non-targeting background")
         background_cell_list = non_target_cell_name_reduced
     
     

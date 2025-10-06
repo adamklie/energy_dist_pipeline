@@ -329,6 +329,9 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
                 "Current Target": target,
                 "total_combis": len(total_combis),
             })
+        
+        down_sampled_list = []
+
         for index_combi, (combi_test1, combi_test2) in enumerate(total_combis):
             # Get cells for the current combination
             cell_test1, cell_test2 = get_cells_for_sgrna_groups(combi_test1, combi_test2, gRNA_dict)
@@ -337,17 +340,25 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
             if not (config["gRNA_filtering"]["combi_cell_num_max"] == "all" or \
                 config["gRNA_filtering"]["combi_cell_num_max"] == "All"):
                 if len(cell_test1) > config["gRNA_filtering"]["combi_cell_num_max"]:
-                    print(f"{target}: Combi1 has too many ({len(cell_test1)}) cells, downsampled to {config["gRNA_filtering"]["combi_cell_num_max"]}")
+                    down_sampled_list.append(target)
+                    #optional print
+                    #print(f"{target}: Combi1 has too many ({len(cell_test1)}) cells, downsampled to {config["gRNA_filtering"]["combi_cell_num_max"]}")
                     cell_test1 = np.random.choice(cell_test1,config["gRNA_filtering"]["combi_cell_num_max"],replace=False)
                 if len(cell_test2) > config["gRNA_filtering"]["combi_cell_num_max"]:
-                    print(f"{target}: Combi2 has too many ({len(cell_test2)}) cells, downsampled to {config["gRNA_filtering"]["combi_cell_num_max"]}")
+                    down_sampled_list.append(target)
+                    #optional print
+                    #print(f"{target}: Combi2 has too many ({len(cell_test2)}) cells, downsampled to {config["gRNA_filtering"]["combi_cell_num_max"]}")
                     cell_test2 = np.random.choice(cell_test2,config["gRNA_filtering"]["combi_cell_num_max"],replace=False)
                 
             # Try calculating on the primary device (potentially GPU)
             # Calculate distance with GPU/CPU fallback
             distance = calculate_distance(pca_df, cell_test1, cell_test2, device)
             res.append(distance)
-
+        
+        if down_sampled_list:
+            down_sampled_set = set(down_sampled_list)
+            print(f"Note: Downsampling was applied for target(s): {', '.join(down_sampled_set)}")
+        
         # 3. Format results into a DataFrame
         result_df = format_results_dataframe(res, total_combis, gRNA_list_target)
 

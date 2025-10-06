@@ -53,13 +53,14 @@ annotation_df = util_functions.load_annotation(config["input_data"]["annotation_
 
 ### plot number of (1) gRNAs removed in the outlier analysis and (2) gRNAs remained
 
+grouping_name = config["input_data"]["annotation_file"]["concatenate_key"]
 
-target_transcript_name_list = np.unique(annotation_df[annotation_df["type"]!="non-targeting"]["intended_target_name"])
+target_transcript_name_list = np.unique(annotation_df[annotation_df["type"]!="non-targeting"][grouping_name])
 sgRNA_outlier_dict = sgRNA_outlier_df.to_dict()["pval_outlier"]
 gRNA_stat_dict = {}
 
 for target_name in tqdm(target_transcript_name_list):
-    gRNA_names_all = annotation_df[annotation_df["intended_target_name"]==target_name]["guide_id"].values
+    gRNA_names_all = annotation_df[annotation_df[grouping_name]==target_name]["guide_id"].values
     gRNA_stat_dict[target_name] = {}
 
     gRNA_dropped = 0

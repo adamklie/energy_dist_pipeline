@@ -32,7 +32,7 @@ output_folder = config["output_file_name_list"]["OUTPUT_FOLDER"]
 
 #Check if the annotation file exist.
 if os.path.exists(config["input_data"]["annotation_file"]):
-    print(f"{config["input_data"]["annotation_file"]} already exist. Please remove file before run this script")
+    print(f"{config['input_data']['annotation_file']} already exist. Please remove file before run this script")
     sys.exit()
 
 if os.path.exists(output_folder)==False:

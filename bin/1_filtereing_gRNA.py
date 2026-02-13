@@ -342,12 +342,12 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
                 if len(cell_test1) > config["gRNA_filtering"]["combi_cell_num_max"]:
                     down_sampled_list.append(target)
                     #optional print
-                    #print(f"{target}: Combi1 has too many ({len(cell_test1)}) cells, downsampled to {config["gRNA_filtering"]["combi_cell_num_max"]}")
+                    #print(f"{target}: Combi1 has too many ({len(cell_test1)}) cells, downsampled to {config['gRNA_filtering']['combi_cell_num_max']}")
                     cell_test1 = np.random.choice(cell_test1,config["gRNA_filtering"]["combi_cell_num_max"],replace=False)
                 if len(cell_test2) > config["gRNA_filtering"]["combi_cell_num_max"]:
                     down_sampled_list.append(target)
                     #optional print
-                    #print(f"{target}: Combi2 has too many ({len(cell_test2)}) cells, downsampled to {config["gRNA_filtering"]["combi_cell_num_max"]}")
+                    #print(f"{target}: Combi2 has too many ({len(cell_test2)}) cells, downsampled to {config['gRNA_filtering']['combi_cell_num_max']}")
                     cell_test2 = np.random.choice(cell_test2,config["gRNA_filtering"]["combi_cell_num_max"],replace=False)
                 
             # Try calculating on the primary device (potentially GPU)

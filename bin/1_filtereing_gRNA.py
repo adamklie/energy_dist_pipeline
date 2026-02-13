@@ -367,6 +367,10 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
 
     print("\nAll target regions processed.")
 
+    # Free GPU memory before disco tests
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     def determine_batch_size(total_cell_num, batch_num_basic):
         """
@@ -586,7 +590,9 @@ if config["gRNA_filtering"]["perform_targeting_filtering"]:
                         p_value = calculate_hypergeometric_pvalue(result_df, gRNA_name_tmp, HYPERGEOM_SIGNIFICANCE_FRACTION)
                         p_val_dict[gRNA_name_tmp] = p_value
                         # print(f"    p-value for {gRNA_name_tmp}: {p_value}") # Optional verbose print
-        # gc.collect() # Uncomment if memory issues are severe, but adds overhead
+        # Free GPU memory between disco test iterations
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 else: # In case, gRNA filtering is skipped
     print("[warning]targeting gRNA filtering is skipped")
     target_keys = []

@@ -163,9 +163,11 @@ def _cleanup_tensors_on_error(local_vars, device):
         torch.cuda.empty_cache()
 
 
-def _cleanup_tensors_success(pairwise_dist_tmp, pairwise_dist, sum_target, 
+def _cleanup_tensors_success(pairwise_dist_tmp, pairwise_dist, sum_target,
                            sum_non_target, sum_cross, all_cells_dist, device):
     del pairwise_dist_tmp, pairwise_dist, sum_target, sum_non_target, sum_cross, all_cells_dist
+    if 'cuda' in str(device) and torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _cleanup_permutation_error(local_vars, device):
@@ -181,11 +183,13 @@ def _cleanup_permutation_error(local_vars, device):
         torch.cuda.empty_cache()
 
 
-def _cleanup_permutation_success(pairwise_dist, pairwise_dist_tmp, sum_target, 
-                                sum_non_target, sum_cross, all_cells_dist, 
+def _cleanup_permutation_success(pairwise_dist, pairwise_dist_tmp, sum_target,
+                                sum_non_target, sum_cross, all_cells_dist,
                                 group_target, group_non_target, extracted, device):
-    del (pairwise_dist, pairwise_dist_tmp, sum_target, sum_non_target, 
+    del (pairwise_dist, pairwise_dist_tmp, sum_target, sum_non_target,
          sum_cross, all_cells_dist, group_target, group_non_target, extracted)
+    if 'cuda' in str(device) and torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 
@@ -265,9 +269,11 @@ def disco_test(X, test_cell_list, device, batch_num=5, total_permute=1000, norm_
         raise e
 
 
-def _cleanup_disco_success(all_cells_dist, between_disp_permute, within_disp_permute, 
+def _cleanup_disco_success(all_cells_dist, between_disp_permute, within_disp_permute,
                           total_disp_permute, pairwise_dist, device):
     del all_cells_dist, between_disp_permute, within_disp_permute, total_disp_permute, pairwise_dist
+    if 'cuda' in str(device) and torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _cleanup_disco_error(local_vars, device):

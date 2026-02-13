@@ -355,7 +355,7 @@ for target_index, target_name in pbar:
     elif not (config["permutation_test"]["target_cell_num_max"]=="all" or \
                   config["permutation_test"]["target_cell_num_max"]=="All"):
         if len(original_target_cell_names)>config["permutation_test"]["target_cell_num_max"]:
-            print(f"Too many ({len(original_target_cell_names)}) cell per target downsampled to {config["permutation_test"]["target_cell_num_max"]}")
+            print(f"Too many ({len(original_target_cell_names)}) cell per target downsampled to {config['permutation_test']['target_cell_num_max']}")
             original_target_cell_names = np.random.choice(original_target_cell_names,
                                                           config["permutation_test"]["target_cell_num_max"],
                                                           replace=False)
